@@ -3,29 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Telegram Mini App</title>
+    <title>Мини приложение</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 20px;
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { 
+            padding: 10px 15px; 
+            background: #0088cc; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
         }
-        button {
-            padding: 10px 20px;
-            background: #0088cc;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
+        #user-data { margin-top: 20px; }
     </style>
 </head>
 <body>
-    <h1>Привет, это мини приложение TG</h1>
-    <p>Самое простое, посмотрим что с ним можно будет сделать</p>
-    <button id="btn">Жми!</button>
-    <p id="output"></p>
+    <h2>Пример простого мини приложени в ТГ</h2>
+    <button id="get-data-btn">Показать мои данные</button>
+    <div id="user-data"></div>
 
     <script>
         const tg = window.Telegram.WebApp;
