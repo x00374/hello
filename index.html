@@ -31,12 +31,24 @@
         const tg = window.Telegram.WebApp;
         tg.expand(); // Развернуть приложение на весь экран
 
-        document.getElementById('btn').addEventListener('click', () => {
-            document.getElementById('output').textContent = `Привет-привет, ${tg.initDataUnsafe.user?.first_name || 'User'}!`;
+        document.getElementById('get-data-btn').addEventListener('click', () => {
+            const user = tg.initDataUnsafe.user; // Данные пользователя
+            
+            if (user) {
+                const userDataHTML = `
+                    <h3>Ваши данные:</h3>
+                    <p>ID: ${user.id}</p>
+                    <p>Имя: ${user.first_name || 'Не указано'}</p>
+                    <p>Фамилия: ${user.last_name || 'Не указана'}</p>
+                    <p>Username: @${user.username || 'Не указан'}</p>
+                    <p>Язык: ${user.language_code || 'Не указан'}</p>
+                `;
+                document.getElementById('user-data').innerHTML = userDataHTML;
+            } else {
+                document.getElementById('user-data').innerHTML = 
+                    "<p>Данные не доступны. Откройте приложение через Telegram.</p>";
+            }
         });
-
-        // Можно закрыть приложение
-        // tg.close();
     </script>
 </body>
 </html>
