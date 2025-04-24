@@ -4,24 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Страны, где я был</title>
+    <!-- Telegram WebApp -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Leaflet (карты) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- GeoJSON-данные стран -->
+    <script src="https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            padding: 15px;
+            margin: 0;
+            padding: 0;
             background: #f5f5f5;
         }
         h1 {
             text-align: center;
-            color: #333;
+            padding: 10px;
+            background: #0088cc;
+            color: white;
+            margin: 0;
         }
         .tabs {
             display: flex;
-            margin-bottom: 20px;
+            background: #ddd;
+            padding: 5px;
         }
         .tab {
             padding: 10px 20px;
-            background: #ddd;
             cursor: pointer;
             border-radius: 5px 5px 0 0;
             margin-right: 5px;
@@ -32,10 +42,19 @@
         }
         .tab-content {
             display: none;
+            padding: 15px;
         }
         .tab-content.active {
             display: block;
         }
+        /* Стили для карты */
+        #map {
+            height: 300px;
+            width: 100%;
+            margin-bottom: 15px;
+            border-radius: 10px;
+        }
+        /* Стили для списка стран */
         .country-list {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -61,11 +80,11 @@
         .country-checkbox {
             margin-left: 10px;
         }
-        #visited-countries {
+        #visited-list {
             list-style-type: none;
             padding: 0;
         }
-        #visited-countries li {
+        #visited-list li {
             padding: 8px;
             background: #e3f2fd;
             margin-bottom: 5px;
@@ -77,15 +96,24 @@
     <h1>🌍 Страны, где я был</h1>
     
     <div class="tabs">
-        <div class="tab active" onclick="openTab('all-countries')">Все страны</div>
-        <div class="tab" onclick="openTab('visited-countries')">Мои страны</div>
+        <div class="tab active" onclick="openTab('map-tab')">Карта</div>
+        <div class="tab" onclick="openTab('list-tab')">Список</div>
+        <div class="tab" onclick="openTab('visited-tab')">Мои страны</div>
     </div>
     
-    <div id="all-countries" class="tab-content active">
+    <!-- Вкладка с картой -->
+    <div id="map-tab" class="tab-content active">
+        <div id="map"></div>
+        <p>Отмечайте страны на карте или в списке.</p>
+    </div>
+    
+    <!-- Вкладка со списком всех стран -->
+    <div id="list-tab" class="tab-content">
         <div class="country-list" id="countries-container"></div>
     </div>
     
-    <div id="visited-countries" class="tab-content">
+    <!-- Вкладка с посещёнными странами -->
+    <div id="visited-tab" class="tab-content">
         <h3>Посещённые страны:</h3>
         <ul id="visited-list"></ul>
     </div>
@@ -94,23 +122,69 @@
         const tg = window.Telegram.WebApp;
         tg.expand(); // Развернуть на весь экран
         
-        // Данные стран (можно расширить)
+        // Данные стран (код, название, флаг)
         const countries = [
-            { code: "us", name: "США", flag: "🇺🇸" },
-            { code: "ru", name: "Россия", flag: "🇷🇺" },
-            { code: "fr", name: "Франция", flag: "🇫🇷" },
-            { code: "de", name: "Германия", flag: "🇩🇪" },
-            { code: "jp", name: "Япония", flag: "🇯🇵" },
-            { code: "br", name: "Бразилия", flag: "🇧🇷" },
-            { code: "in", name: "Индия", flag: "🇮🇳" },
-            { code: "cn", name: "Китай", flag: "🇨🇳" },
+            { code: "US", name: "США", flag: "🇺🇸" },
+            { code: "RU", name: "Россия", flag: "🇷🇺" },
+            { code: "FR", name: "Франция", flag: "🇫🇷" },
+            { code: "DE", name: "Германия", flag: "🇩🇪" },
+            { code: "JP", name: "Япония", flag: "🇯🇵" },
+            { code: "BR", name: "Бразилия", flag: "🇧🇷" },
+            { code: "IN", name: "Индия", flag: "🇮🇳" },
+            { code: "CN", name: "Китай", flag: "🇨🇳" },
             // Добавь остальные страны...
         ];
 
         // Загрузка сохранённых данных
         let visitedCountries = JSON.parse(localStorage.getItem('visitedCountries')) || [];
         
-        // Отображение всех стран
+        // Инициализация карты
+        let map;
+        let geoJsonLayer;
+        
+        function initMap() {
+            map = L.map('map').setView([20, 0], 2);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+            
+            // Загрузка GeoJSON и подсветка выбранных стран
+            fetch('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json')
+                .then(response => response.json())
+                .then(data => {
+                    geoJsonLayer = L.geoJSON(data, {
+                        style: function(feature) {
+                            return {
+                                fillColor: visitedCountries.includes(feature.id) ? '#0088cc' : '#dddddd',
+                                fillOpacity: 0.7,
+                                color: '#ffffff',
+                                weight: 1
+                            };
+                        },
+                        onEachFeature: function(feature, layer) {
+                            layer.on({
+                                click: function() {
+                                    toggleCountry(feature.id);
+                                }
+                            });
+                        }
+                    }).addTo(map);
+                });
+        }
+        
+        // Обновление стиля карты
+        function updateMap() {
+            if (geoJsonLayer) {
+                geoJsonLayer.setStyle(function(feature) {
+                    return {
+                        fillColor: visitedCountries.includes(feature.id) ? '#0088cc' : '#dddddd',
+                        fillOpacity: 0.7
+                    };
+                });
+            }
+        }
+        
+        // Отображение списка стран
         function renderCountries() {
             const container = document.getElementById('countries-container');
             container.innerHTML = '';
@@ -141,7 +215,9 @@
                 visitedCountries.push(code);
             }
             localStorage.setItem('visitedCountries', JSON.stringify(visitedCountries));
+            updateMap();
             renderVisitedCountries();
+            renderCountries();
         }
         
         // Показ посещённых стран
@@ -172,11 +248,18 @@
             
             document.getElementById(tabId).classList.add('active');
             event.currentTarget.classList.add('active');
+            
+            // Обновляем карту при открытии вкладки
+            if (tabId === 'map-tab' && !map) {
+                initMap();
+            }
         }
         
         // Инициализация
-        renderCountries();
-        renderVisitedCountries();
+        document.addEventListener('DOMContentLoaded', () => {
+            renderCountries();
+            renderVisitedCountries();
+        });
     </script>
 </body>
 </html>
