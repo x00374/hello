@@ -3,48 +3,180 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Мини приложение</title>
+    <title>Страны, где я был</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        button { 
-            padding: 10px 15px; 
-            background: #0088cc; 
-            color: white; 
-            border: none; 
-            border-radius: 5px; 
-            cursor: pointer; 
+        body {
+            font-family: Arial, sans-serif;
+            padding: 15px;
+            background: #f5f5f5;
         }
-        #user-data { margin-top: 20px; }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            background: #ddd;
+            cursor: pointer;
+            border-radius: 5px 5px 0 0;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background: #0088cc;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .country-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        .country-item {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+        }
+        .country-flag {
+            width: 20px;
+            height: 15px;
+            margin-right: 10px;
+            border: 1px solid #eee;
+        }
+        .country-name {
+            flex-grow: 1;
+        }
+        .country-checkbox {
+            margin-left: 10px;
+        }
+        #visited-countries {
+            list-style-type: none;
+            padding: 0;
+        }
+        #visited-countries li {
+            padding: 8px;
+            background: #e3f2fd;
+            margin-bottom: 5px;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
-    <h2>Пример простого мини приложени в ТГ</h2>
-    <button id="get-data-btn">Показать мои данные</button>
-    <div id="user-data"></div>
+    <h1>🌍 Страны, где я был</h1>
+    
+    <div class="tabs">
+        <div class="tab active" onclick="openTab('all-countries')">Все страны</div>
+        <div class="tab" onclick="openTab('visited-countries')">Мои страны</div>
+    </div>
+    
+    <div id="all-countries" class="tab-content active">
+        <div class="country-list" id="countries-container"></div>
+    </div>
+    
+    <div id="visited-countries" class="tab-content">
+        <h3>Посещённые страны:</h3>
+        <ul id="visited-list"></ul>
+    </div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Развернуть приложение на весь экран
+        tg.expand(); // Развернуть на весь экран
+        
+        // Данные стран (можно расширить)
+        const countries = [
+            { code: "us", name: "США", flag: "🇺🇸" },
+            { code: "ru", name: "Россия", flag: "🇷🇺" },
+            { code: "fr", name: "Франция", flag: "🇫🇷" },
+            { code: "de", name: "Германия", flag: "🇩🇪" },
+            { code: "jp", name: "Япония", flag: "🇯🇵" },
+            { code: "br", name: "Бразилия", flag: "🇧🇷" },
+            { code: "in", name: "Индия", flag: "🇮🇳" },
+            { code: "cn", name: "Китай", flag: "🇨🇳" },
+            // Добавь остальные страны...
+        ];
 
-        document.getElementById('get-data-btn').addEventListener('click', () => {
-            const user = tg.initDataUnsafe.user; // Данные пользователя
+        // Загрузка сохранённых данных
+        let visitedCountries = JSON.parse(localStorage.getItem('visitedCountries')) || [];
+        
+        // Отображение всех стран
+        function renderCountries() {
+            const container = document.getElementById('countries-container');
+            container.innerHTML = '';
             
-            if (user) {
-                const userDataHTML = `
-                    <h3>Ваши данные:</h3>
-                    <p>ID: ${user.id}</p>
-                    <p>Имя: ${user.first_name || 'Не указано'}</p>
-                    <p>Фамилия: ${user.last_name || 'Не указана'}</p>
-                    <p>Username: @${user.username || 'Не указан'}</p>
-                    <p>Язык: ${user.language_code || 'Не указан'}</p>
+            countries.forEach(country => {
+                const isVisited = visitedCountries.includes(country.code);
+                const countryElement = document.createElement('div');
+                countryElement.className = 'country-item';
+                countryElement.innerHTML = `
+                    <span class="country-flag">${country.flag}</span>
+                    <span class="country-name">${country.name}</span>
+                    <input 
+                        type="checkbox" 
+                        class="country-checkbox" 
+                        ${isVisited ? 'checked' : ''}
+                        onchange="toggleCountry('${country.code}')"
+                    >
                 `;
-                document.getElementById('user-data').innerHTML = userDataHTML;
+                container.appendChild(countryElement);
+            });
+        }
+        
+        // Переключение страны
+        function toggleCountry(code) {
+            if (visitedCountries.includes(code)) {
+                visitedCountries = visitedCountries.filter(c => c !== code);
             } else {
-                document.getElementById('user-data').innerHTML = 
-                    "<p>Данные не доступны. Откройте приложение через Telegram.</p>";
+                visitedCountries.push(code);
             }
-        });
+            localStorage.setItem('visitedCountries', JSON.stringify(visitedCountries));
+            renderVisitedCountries();
+        }
+        
+        // Показ посещённых стран
+        function renderVisitedCountries() {
+            const visitedList = document.getElementById('visited-list');
+            visitedList.innerHTML = '';
+            
+            const visited = countries.filter(c => visitedCountries.includes(c.code));
+            if (visited.length === 0) {
+                visitedList.innerHTML = '<li>Вы ещё не отметили ни одной страны 😢</li>';
+            } else {
+                visited.forEach(country => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `${country.flag} ${country.name}`;
+                    visitedList.appendChild(li);
+                });
+            }
+        }
+        
+        // Переключение вкладок
+        function openTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+        
+        // Инициализация
+        renderCountries();
+        renderVisitedCountries();
     </script>
 </body>
 </html>
