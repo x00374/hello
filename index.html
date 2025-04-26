@@ -1,91 +1,177 @@
-import { WebAppProvider, useWebApp } from '@vkruglikov/react-telegram-web-app';
-import { useState, useEffect } from 'react';
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Loader } from "lucide-react"; // Иконка для загрузки
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мои уникальные подарки</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 15px;
+            background: #f5f5f5;
+            margin: 0;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .gifts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .gift-item {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .gift-image {
+            width: 100%;
+            height: 120px;
+            object-fit: contain;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .gift-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .gift-meta {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .loading, .error {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .sender-info {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+        }
+        .sender-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎁 Мои уникальные подарки</h1>
+    <div id="gifts-container" class="loading">Загрузка подарков...</div>
 
-export default function GiftsApp() {
-  const webApp = useWebApp();
-  const [gifts, setGifts] = useState([]);
-  const [filteredGifts, setFilteredGifts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [sortColor, setSortColor] = useState("");
-  const [error, setError] = useState(null);
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
 
-  useEffect(() => {
-    async function loadGifts() {
-      try {
-        const response = await window.Telegram.WebApp.CloudStorage.invokeMethod('OwnedGiftUnique', {});
-        const loadedGifts = response.gifts || [];
-        setGifts(loadedGifts);
-        setFilteredGifts(loadedGifts);
-      } catch (err) {
-        console.error('Ошибка загрузки подарков:', err);
-        setError('Не удалось загрузить подарки 😔');
-      } finally {
-        setLoading(false);
-      }
-    }
+        // Основная функция для запроса подарков
+        async function fetchOwnedGifts() {
+            try {
+                // Проверяем, доступен ли метод в текущей версии WebApp
+                if (!tg.sendData || typeof tg.sendData !== 'function') {
+                    throw new Error('Метод отправки данных не доступен');
+                }
 
-    loadGifts();
-  }, []);
+                // Отправляем запрос на получение подарков
+                const response = await tg.sendData({
+                    method: "OwnedGiftUnique",
+                    params: {
+                        user_id: tg.initDataUnsafe.user?.id
+                    }
+                });
 
-  const handleSort = (color) => {
-    if (color === "") {
-      setFilteredGifts(gifts);
-    } else {
-      const sorted = gifts.filter(gift => gift.background_color?.toLowerCase() === color.toLowerCase());
-      setFilteredGifts(sorted);
-    }
-    setSortColor(color);
-  };
+                if (!response || !response.ok) {
+                    throw new Error('Не удалось получить подарки');
+                }
 
-  const uniqueColors = [...new Set(gifts.map(g => g.background_color))].filter(Boolean);
+                return response.result || [];
+            } catch (error) {
+                console.error('Ошибка при запросе подарков:', error);
+                throw error;
+            }
+        }
 
-  return (
-    <WebAppProvider>
-      <div className="p-4 space-y-4">
-        <h1 className="text-xl font-bold text-center">Твои подарки 🎁</h1>
+        // Функция для отображения подарков
+        async function renderGifts() {
+            const container = document.getElementById('gifts-container');
+            
+            try {
+                const gifts = await fetchOwnedGifts();
+                
+                if (gifts.length === 0) {
+                    container.innerHTML = '<div class="error">У вас пока нет уникальных подарков</div>';
+                    return;
+                }
 
-        {loading ? (
-          <div className="flex justify-center items-center h-32">
-            <Loader className="animate-spin w-8 h-8 text-gray-500" />
-          </div>
-        ) : error ? (
-          <div className="text-center text-red-500">{error}</div>
-        ) : (
-          <>
-            <div className="flex flex-wrap gap-2 justify-center">
-              <Button variant={sortColor === "" ? "default" : "outline"} onClick={() => handleSort("")}>
-                Все
-              </Button>
-              {uniqueColors.map(color => (
-                <Button
-                  key={color}
-                  variant={sortColor === color ? "default" : "outline"}
-                  onClick={() => handleSort(color)}
-                >
-                  {color}
-                </Button>
-              ))}
-            </div>
+                let html = '<div class="gifts-grid">';
+                
+                gifts.forEach(gift => {
+                    const sendDate = new Date(gift.send_date * 1000).toLocaleDateString();
+                    let senderInfo = '';
+                    
+                    if (gift.sender_user) {
+                        senderInfo = `
+                            <div class="sender-info">
+                                <img src="${gift.sender_user.photo_url || ''}" 
+                                     class="sender-avatar" 
+                                     onerror="this.style.display='none'">
+                                <span>От: ${gift.sender_user.first_name || 'Неизвестно'}</span>
+                            </div>
+                        `;
+                    }
 
-            {filteredGifts.length > 0 ? (
-              <div className="grid gap-4">
-                {filteredGifts.map(gift => (
-                  <Card key={gift.id} className="p-4" style={{ backgroundColor: gift.background_color || "#f0f0f0" }}>
-                    <CardContent className="text-center font-medium">
-                      {gift.name || "Без названия"}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center text-gray-500">Нет подарков с таким цветом 😅</div>
-            )}
-          </>
-        )}
-      </div>
-    </WebAppProvider>
-  );
-}
+                    html += `
+                        <div class="gift-item">
+                            <img src="${gift.gift.image_url}" 
+                                 class="gift-image" 
+                                 alt="${gift.gift.title}"
+                                 onerror="this.src='https://via.placeholder.com/200?text=Нет+изображения'">
+                            <div class="gift-title">${gift.gift.title}</div>
+                            <div class="gift-meta">
+                                <div>Получен: ${sendDate}</div>
+                                ${gift.is_saved ? '<div>⭐ На профиле</div>' : ''}
+                                ${gift.can_be_transferred ? 
+                                    `<div>Можно передать (${gift.transfer_star_count || 0} звёзд)</div>` : 
+                                    ''}
+                            </div>
+                            ${senderInfo}
+                        </div>
+                    `;
+                });
+
+                html += '</div>';
+                container.innerHTML = html;
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="error">
+                        Ошибка загрузки: ${error.message}<br>
+                        <small>Попробуйте позже или обновите страницу</small>
+                    </div>
+                `;
+            }
+        }
+
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!tg.initDataUnsafe.user) {
+                document.getElementById('gifts-container').innerHTML = `
+                    <div class="error">
+                        Откройте приложение через Telegram
+                    </div>
+                `;
+                return;
+            }
+            
+            renderGifts();
+        });
+    </script>
+</body>
+</html>
