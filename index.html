@@ -3,281 +3,149 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Страны, где я был</title>
+    <title>Мои подарки</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Chart.js для графика -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
+            padding: 15px;
             background: #f5f5f5;
+            margin: 0;
         }
         h1 {
             text-align: center;
-            padding: 15px;
-            background: #0088cc;
-            color: white;
-            margin: 0;
+            color: #333;
         }
-        .tabs {
+        .controls {
             display: flex;
-            background: #ddd;
-            padding: 5px;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
         }
-        .tab {
-            padding: 10px 20px;
-            cursor: pointer;
-            border-radius: 5px 5px 0 0;
-            margin-right: 5px;
+        select, button {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            background: white;
         }
-        .tab.active {
-            background: #0088cc;
-            color: white;
+        .gifts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px;
         }
-        .tab-content {
-            display: none;
-            padding: 15px;
-        }
-        .tab-content.active {
-            display: block;
-        }
-        /* График */
-        #stats-chart {
-            max-width: 100%;
-            margin: 20px auto;
+        .gift-item {
             background: white;
             border-radius: 10px;
-            padding: 10px;
-        }
-        /* Список стран */
-        .country-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 10px;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        .country-item {
-            background: white;
-            padding: 10px;
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             display: flex;
+            flex-direction: column;
             align-items: center;
+            padding: 10px;
         }
-        .country-flag {
-            width: 24px;
-            height: 18px;
-            margin-right: 10px;
+        .gift-image {
+            width: 100px;
+            height: 100px;
+            object-fit: contain;
+            margin-bottom: 5px;
+        }
+        .gift-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-top: 5px;
             border: 1px solid #eee;
         }
-        .country-name {
-            flex-grow: 1;
-            font-size: 14px;
-        }
-        .country-checkbox {
-            margin-left: 10px;
-        }
-        /* Посещённые страны */
-        #visited-list {
-            list-style-type: none;
-            padding: 0;
-        }
-        #visited-list li {
-            padding: 10px;
-            background: #e3f2fd;
-            margin-bottom: 5px;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-        }
-        #visited-list li img {
-            margin-right: 10px;
-        }
-        .search-box {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
+        .no-gifts {
+            text-align: center;
+            padding: 20px;
+            color: #666;
         }
     </style>
 </head>
 <body>
-    <h1>🌍 Страны, где я был</h1>
+    <h1>🎁 Мои подарки</h1>
     
-    <div class="tabs">
-        <div class="tab active" onclick="openTab('list-tab')">Все страны</div>
-        <div class="tab" onclick="openTab('visited-tab')">Мои страны</div>
-        <div class="tab" onclick="openTab('stats-tab')">Статистика</div>
+    <div class="controls">
+        <select id="color-filter">
+            <option value="all">Все цвета</option>
+            <option value="red">Красные</option>
+            <option value="blue">Синие</option>
+            <option value="green">Зеленые</option>
+            <option value="yellow">Желтые</option>
+            <option value="purple">Фиолетовые</option>
+        </select>
+        <button onclick="applyFilter()">Применить</button>
     </div>
     
-    <!-- Вкладка со списком стран -->
-    <div id="list-tab" class="tab-content active">
-        <input type="text" id="search" class="search-box" placeholder="Поиск страны..." oninput="filterCountries()">
-        <div class="country-list" id="countries-container"></div>
-    </div>
-    
-    <!-- Вкладка с посещёнными странами -->
-    <div id="visited-tab" class="tab-content">
-        <h3>Посещённые страны: <span id="visited-count">0</span></h3>
-        <ul id="visited-list"></ul>
-    </div>
-    
-    <!-- Вкладка со статистикой -->
-    <div id="stats-tab" class="tab-content">
-        <h3>Ваша статистика:</h3>
-        <canvas id="stats-chart"></canvas>
-        <div id="stats-text"></div>
+    <div class="gifts-grid" id="gifts-container">
+        <!-- Подарки будут загружены здесь -->
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
         
-        // Полный список стран (код, название)
-        const countries = [
-            { code: "AF", name: "Афганистан" },
-            { code: "AL", name: "Албания" },
-            { code: "DZ", name: "Алжир" },
-            // ... Все страны из https://countrycode.org/
-            { code: "US", name: "США" },
-            { code: "RU", name: "Россия" },
-            { code: "GB", name: "Великобритания" },
-            { code: "JP", name: "Япония" }
-            // Полный список можно скачать тут: https://pastebin.com/raw/XYZ12345
+        // Мок-данные подарков (в реальности нужно получать через Bot API)
+        const mockGifts = [
+            { id: 1, image: "https://via.placeholder.com/100/ff0000/ffffff?text=Gift1", color: "red", title: "Красный подарок" },
+            { id: 2, image: "https://via.placeholder.com/100/0000ff/ffffff?text=Gift2", color: "blue", title: "Синий подарок" },
+            { id: 3, image: "https://via.placeholder.com/100/00ff00/ffffff?text=Gift3", color: "green", title: "Зеленый подарок" },
+            { id: 4, image: "https://via.placeholder.com/100/ffff00/000000?text=Gift4", color: "yellow", title: "Желтый подарок" },
+            { id: 5, image: "https://via.placeholder.com/100/800080/ffffff?text=Gift5", color: "purple", title: "Фиолетовый подарок" },
+            { id: 6, image: "https://via.placeholder.com/100/ff0000/ffffff?text=Gift6", color: "red", title: "Красный подарок 2" },
         ];
-
-        let visitedCountries = JSON.parse(localStorage.getItem('visitedCountries')) || [];
-        let chart = null;
         
-        // Загрузка списка стран
-        function renderCountries(filter = "") {
-            const container = document.getElementById('countries-container');
-            container.innerHTML = '';
-            
-            const filtered = countries.filter(c => 
-                c.name.toLowerCase().includes(filter.toLowerCase())
-            );
-            
-            filtered.forEach(country => {
-                const isVisited = visitedCountries.includes(country.code);
-                const countryElement = document.createElement('div');
-                countryElement.className = 'country-item';
-                countryElement.innerHTML = `
-                    <img src="https://flagcdn.com/24x18/${country.code.toLowerCase()}.png" 
-                         class="country-flag" 
-                         alt="${country.name}">
-                    <span class="country-name">${country.name}</span>
-                    <input 
-                        type="checkbox" 
-                        class="country-checkbox" 
-                        ${isVisited ? 'checked' : ''}
-                        onchange="toggleCountry('${country.code}')"
-                    >
-                `;
-                container.appendChild(countryElement);
-            });
+        // Загрузка подарков
+        function loadGifts() {
+            // В реальном приложении здесь должен быть запрос к API Telegram
+            renderGifts(mockGifts);
         }
         
-        // Поиск стран
-        function filterCountries() {
-            const searchText = document.getElementById('search').value;
-            renderCountries(searchText);
-        }
-        
-        // Переключение страны
-        function toggleCountry(code) {
-            if (visitedCountries.includes(code)) {
-                visitedCountries = visitedCountries.filter(c => c !== code);
-            } else {
-                visitedCountries.push(code);
+        // Отображение подарков
+        function renderGifts(gifts) {
+            const container = document.getElementById('gifts-container');
+            
+            if (gifts.length === 0) {
+                container.innerHTML = '<div class="no-gifts">Подарков не найдено</div>';
+                return;
             }
-            localStorage.setItem('visitedCountries', JSON.stringify(visitedCountries));
-            renderVisitedCountries();
-            updateStats();
+            
+            container.innerHTML = gifts.map(gift => `
+                <div class="gift-item">
+                    <img src="${gift.image}" alt="${gift.title}" class="gift-image">
+                    <div style="font-size: 12px; text-align: center;">${gift.title}</div>
+                    <div class="gift-color" style="background: ${getColorHex(gift.color)};"></div>
+                </div>
+            `).join('');
         }
         
-        // Обновление списка посещённых стран
-        function renderVisitedCountries() {
-            const visitedList = document.getElementById('visited-list');
-            visitedList.innerHTML = '';
+        // Фильтрация по цвету
+        function applyFilter() {
+            const color = document.getElementById('color-filter').value;
+            let filteredGifts = mockGifts;
             
-            const visited = countries.filter(c => visitedCountries.includes(c.code));
-            document.getElementById('visited-count').textContent = visited.length;
-            
-            if (visited.length === 0) {
-                visitedList.innerHTML = '<li>Вы ещё не отметили ни одной страны 😢</li>';
-            } else {
-                visited.forEach(country => {
-                    const li = document.createElement('li');
-                    li.innerHTML = `
-                        <img src="https://flagcdn.com/24x18/${country.code.toLowerCase()}.png" 
-                             alt="${country.name}">
-                        ${country.name}
-                    `;
-                    visitedList.appendChild(li);
-                });
+            if (color !== 'all') {
+                filteredGifts = mockGifts.filter(gift => gift.color === color);
             }
+            
+            renderGifts(filteredGifts);
         }
         
-        // Статистика (график)
-        function updateStats() {
-            const total = countries.length;
-            const visited = visitedCountries.length;
-            const percent = Math.round((visited / total) * 100);
-            
-            // Текстовая статистика
-            document.getElementById('stats-text').innerHTML = `
-                <p>Посещено: <strong>${visited}</strong> из <strong>${total}</strong> стран</p>
-                <p>Прогресс: <strong>${percent}%</strong></p>
-            `;
-            
-            // График
-            const ctx = document.getElementById('stats-chart').getContext('2d');
-            if (chart) chart.destroy();
-            
-            chart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Посещённые', 'Остальные'],
-                    datasets: [{
-                        data: [visited, total - visited],
-                        backgroundColor: ['#0088cc', '#dddddd'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { position: 'bottom' }
-                    }
-                }
-            });
-        }
-        
-        // Переключение вкладок
-        function openTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            
-            document.getElementById(tabId).classList.add('active');
-            event.currentTarget.classList.add('active');
-            
-            if (tabId === 'stats-tab') updateStats();
+        // Получение HEX-кода цвета
+        function getColorHex(colorName) {
+            const colors = {
+                red: '#ff0000',
+                blue: '#0000ff',
+                green: '#00ff00',
+                yellow: '#ffff00',
+                purple: '#800080'
+            };
+            return colors[colorName] || '#cccccc';
         }
         
         // Инициализация
-        document.addEventListener('DOMContentLoaded', () => {
-            renderCountries();
-            renderVisitedCountries();
-        });
+        document.addEventListener('DOMContentLoaded', loadGifts);
     </script>
 </body>
 </html>
