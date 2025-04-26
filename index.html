@@ -1,151 +1,91 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Мои подарки</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 15px;
-            background: #f5f5f5;
-            margin: 0;
-        }
-        h1 {
-            text-align: center;
-            color: #333;
-        }
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-        }
-        select, button {
-            padding: 8px 12px;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-            background: white;
-        }
-        .gifts-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 10px;
-        }
-        .gift-item {
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 10px;
-        }
-        .gift-image {
-            width: 100px;
-            height: 100px;
-            object-fit: contain;
-            margin-bottom: 5px;
-        }
-        .gift-color {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            margin-top: 5px;
-            border: 1px solid #eee;
-        }
-        .no-gifts {
-            text-align: center;
-            padding: 20px;
-            color: #666;
-        }
-    </style>
-</head>
-<body>
-    <h1>🎁 Мои подарки</h1>
-    
-    <div class="controls">
-        <select id="color-filter">
-            <option value="all">Все цвета</option>
-            <option value="red">Красные</option>
-            <option value="blue">Синие</option>
-            <option value="green">Зеленые</option>
-            <option value="yellow">Желтые</option>
-            <option value="purple">Фиолетовые</option>
-        </select>
-        <button onclick="applyFilter()">Применить</button>
-    </div>
-    
-    <div class="gifts-grid" id="gifts-container">
-        <!-- Подарки будут загружены здесь -->
-    </div>
+import { WebAppProvider, useWebApp } from '@vkruglikov/react-telegram-web-app';
+import { useState, useEffect } from 'react';
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Loader } from "lucide-react"; // Иконка для загрузки
 
-    <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        
-        // Мок-данные подарков (в реальности нужно получать через Bot API)
-        const mockGifts = [
-            { id: 1, image: "https://via.placeholder.com/100/ff0000/ffffff?text=Gift1", color: "red", title: "Красный подарок" },
-            { id: 2, image: "https://via.placeholder.com/100/0000ff/ffffff?text=Gift2", color: "blue", title: "Синий подарок" },
-            { id: 3, image: "https://via.placeholder.com/100/00ff00/ffffff?text=Gift3", color: "green", title: "Зеленый подарок" },
-            { id: 4, image: "https://via.placeholder.com/100/ffff00/000000?text=Gift4", color: "yellow", title: "Желтый подарок" },
-            { id: 5, image: "https://via.placeholder.com/100/800080/ffffff?text=Gift5", color: "purple", title: "Фиолетовый подарок" },
-            { id: 6, image: "https://via.placeholder.com/100/ff0000/ffffff?text=Gift6", color: "red", title: "Красный подарок 2" },
-        ];
-        
-        // Загрузка подарков
-        function loadGifts() {
-            // В реальном приложении здесь должен быть запрос к API Telegram
-            renderGifts(mockGifts);
-        }
-        
-        // Отображение подарков
-        function renderGifts(gifts) {
-            const container = document.getElementById('gifts-container');
-            
-            if (gifts.length === 0) {
-                container.innerHTML = '<div class="no-gifts">Подарков не найдено</div>';
-                return;
-            }
-            
-            container.innerHTML = gifts.map(gift => `
-                <div class="gift-item">
-                    <img src="${gift.image}" alt="${gift.title}" class="gift-image">
-                    <div style="font-size: 12px; text-align: center;">${gift.title}</div>
-                    <div class="gift-color" style="background: ${getColorHex(gift.color)};"></div>
-                </div>
-            `).join('');
-        }
-        
-        // Фильтрация по цвету
-        function applyFilter() {
-            const color = document.getElementById('color-filter').value;
-            let filteredGifts = mockGifts;
-            
-            if (color !== 'all') {
-                filteredGifts = mockGifts.filter(gift => gift.color === color);
-            }
-            
-            renderGifts(filteredGifts);
-        }
-        
-        // Получение HEX-кода цвета
-        function getColorHex(colorName) {
-            const colors = {
-                red: '#ff0000',
-                blue: '#0000ff',
-                green: '#00ff00',
-                yellow: '#ffff00',
-                purple: '#800080'
-            };
-            return colors[colorName] || '#cccccc';
-        }
-        
-        // Инициализация
-        document.addEventListener('DOMContentLoaded', loadGifts);
-    </script>
-</body>
-</html>
+export default function GiftsApp() {
+  const webApp = useWebApp();
+  const [gifts, setGifts] = useState([]);
+  const [filteredGifts, setFilteredGifts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sortColor, setSortColor] = useState("");
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function loadGifts() {
+      try {
+        const response = await window.Telegram.WebApp.CloudStorage.invokeMethod('OwnedGiftUnique', {});
+        const loadedGifts = response.gifts || [];
+        setGifts(loadedGifts);
+        setFilteredGifts(loadedGifts);
+      } catch (err) {
+        console.error('Ошибка загрузки подарков:', err);
+        setError('Не удалось загрузить подарки 😔');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadGifts();
+  }, []);
+
+  const handleSort = (color) => {
+    if (color === "") {
+      setFilteredGifts(gifts);
+    } else {
+      const sorted = gifts.filter(gift => gift.background_color?.toLowerCase() === color.toLowerCase());
+      setFilteredGifts(sorted);
+    }
+    setSortColor(color);
+  };
+
+  const uniqueColors = [...new Set(gifts.map(g => g.background_color))].filter(Boolean);
+
+  return (
+    <WebAppProvider>
+      <div className="p-4 space-y-4">
+        <h1 className="text-xl font-bold text-center">Твои подарки 🎁</h1>
+
+        {loading ? (
+          <div className="flex justify-center items-center h-32">
+            <Loader className="animate-spin w-8 h-8 text-gray-500" />
+          </div>
+        ) : error ? (
+          <div className="text-center text-red-500">{error}</div>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2 justify-center">
+              <Button variant={sortColor === "" ? "default" : "outline"} onClick={() => handleSort("")}>
+                Все
+              </Button>
+              {uniqueColors.map(color => (
+                <Button
+                  key={color}
+                  variant={sortColor === color ? "default" : "outline"}
+                  onClick={() => handleSort(color)}
+                >
+                  {color}
+                </Button>
+              ))}
+            </div>
+
+            {filteredGifts.length > 0 ? (
+              <div className="grid gap-4">
+                {filteredGifts.map(gift => (
+                  <Card key={gift.id} className="p-4" style={{ backgroundColor: gift.background_color || "#f0f0f0" }}>
+                    <CardContent className="text-center font-medium">
+                      {gift.name || "Без названия"}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center text-gray-500">Нет подарков с таким цветом 😅</div>
+            )}
+          </>
+        )}
+      </div>
+    </WebAppProvider>
+  );
+}
